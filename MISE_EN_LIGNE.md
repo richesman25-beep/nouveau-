@@ -1,78 +1,59 @@
-# Obtenir un lien Internet public
+# Mise en ligne — Vercel
 
-Le dossier contient une application web prête pour un hébergement Python.
-Les visiteurs utilisent leur navigateur sur ordinateur ou téléphone et n'installent pas Python.
-L'application n'est pas publiée simplement en téléchargeant ce dossier.
+## Corriger le déploiement existant
 
-## Option recommandée : Render
+L'erreur « Found app.py but it does not export a top-level app, application, or handler »
+provenait de l'ancienne interface Streamlit. La version actuelle utilise Flask et
+exporte une variable `app` à la racine de `app.py`.
 
-Prérequis : un compte GitHub et un compte Render pouvant lire votre dépôt.
+1. Dans votre projet Vercel, vérifiez que le dépôt est **richesman25-beep/nouveau-**
+   et que la branche de production est **main**.
+2. Root Directory : racine du dépôt, là où se trouve `app.py`.
+3. Laissez la détection **Flask** et l'installation de `requirements.txt` actives.
+   Retirez les anciennes commandes Streamlit et tout Output Directory personnalisé.
+   Aucun `npm run build`, `streamlit run` ou dossier `dist` n'est nécessaire.
+4. Déployez le dernier commit de `main`. Si l'ancien échec reste affiché,
+   lancez un nouveau déploiement depuis Git ; ne redéployez pas l'ancien commit.
+5. Ouvrez l'URL HTTPS fournie par Vercel. Le chemin `/health` doit répondre
+   `{"status":"ok"}`.
 
-1. Ouvrez le dépôt **richesman25-beep/nouveau-**, branche **main**.
-   Les fichiers applicatifs et `render.yaml` sont à la racine de cette branche.
-2. Connectez votre compte GitHub à Render et autorisez l'accès à ce dépôt.
-   Aucun dossier `.venv`, donnée personnelle ou clé API n'est nécessaire.
-3. Dans Render, créez un **Blueprint**, sélectionnez le dépôt **nouveau-**,
-   choisissez la branche **main** et utilisez `render.yaml`.
-   Render installe les dépendances et démarre le service. Vérifiez les conditions et tarifs
-   affichés avant de valider la création ; le manifeste demande l'offre `free`.
-4. Attendez que le déploiement soit opérationnel, puis ouvrez **l'adresse HTTPS fournie par Render**.
-   C'est le lien que vous pourrez utiliser et partager. Aucune adresse publique n'est encore créée ici.
+Le push peut déclencher le déploiement automatiquement si l'intégration Git Vercel
+est active. La publication distante et son résultat ne sont pas vérifiables sans
+accès au projet Vercel. Aucune clé API n'est nécessaire au fonctionnement de l'application.
 
-Si vous préférez créer un **Web Service** manuellement :
+## Configuration fournie
 
-| Champ | Valeur |
-| --- | --- |
-| Runtime | Python |
-| Branche | `main` |
-| Répertoire racine | racine du dépôt, là où se trouve `app.py` |
-| Build command | `pip install --disable-pip-version-check -r requirements.txt` |
-| Start command | `bash web-start.sh` |
-| Variable `PYTHON_VERSION` | `3.12.14` |
-| Health check | `/_stcore/health` |
+- `app.py` : application Flask WSGI avec export `app`.
+- `.python-version` : Python 3.12.
+- `requirements.txt` : dépendances du serveur ; Streamlit et PyArrow n'en font plus partie.
+- `vercel.json` : inclusion des templates et fichiers statiques, durée maximale de 60 s
+  sous réserve des limites du compte.
+- `static/` : interface et Plotly local, sans dépendance à un CDN dans le navigateur.
 
-Le port est lu dans `PORT`, fourni par l'hébergeur. Le serveur écoute sur `0.0.0.0`.
-Render gère le certificat HTTPS et le proxy ; les protections CORS/XSRF de Streamlit restent actives.
-Une offre gratuite peut mettre le service en veille ou limiter ses ressources ; le premier
-chargement peut donc être lent. Le fichier local ne permet pas de vérifier les conditions
-actuelles de votre compte.
+L'application utilise des requêtes HTTP classiques. Elle ne lance aucun serveur
+Streamlit, tâche en arrière-plan ou connexion WebSocket persistante.
+Les imports sont limités à 3 Mo et 10 000 bougies pour réduire le temps de calcul et
+rester sous la limite de requête de l'hébergement ; diminuez la période si un calcul
+expire sur votre offre.
 
-## Alternative : Streamlit Community Cloud
+## Vérifications après publication
 
-Après avoir envoyé le code dans un dépôt GitHub, créez une application depuis votre
-compte Streamlit Community Cloud. Sélectionnez le dépôt, sa branche et `app.py` comme
-fichier principal. Choisissez Python 3.12 dans les réglages disponibles.
-Les dépendances sont installées depuis `requirements.txt` et le service fournit son URL HTTPS.
-`render.yaml` et `web-start.sh` ne sont pas nécessaires pour cette option.
+1. L'accueil affiche le graphique des prix fictifs et le RSI.
+2. L'onglet Simulation affiche le capital et le journal après coûts.
+3. Importez `exemple_donnees_simulees.csv` et relancez l'analyse : la source devient CSV.
+4. Les trois exports (cours CSV, rapport JSON, journal CSV) sont téléchargeables.
+5. Vérifiez l'affichage sur téléphone.
 
-## Vérifier après publication
+## Alternative Render
 
-- Le lien HTTPS ouvre « Atelier Trading » et affiche les graphiques de démonstration.
-- L'onglet Simulation historique affiche le capital et le journal.
-- Un CSV valide peut être importé, et un CSV invalide affiche un message explicite.
-- Les téléchargements CSV et JSON fonctionnent.
-- Testez aussi depuis votre téléphone et une seconde session de navigateur.
-
-Ces contrôles ont été effectués sur le serveur de développement, sauf la publication
-Internet et la vérification de l'hébergeur, qui nécessitent votre compte.
+Créez un Blueprint depuis le même dépôt, branche `main`, à la racine du projet.
+`render.yaml` installe les dépendances et lance Gunicorn avec `bash web-start.sh`.
+Le port vient de `PORT` et le contrôle de santé utilise `/health`.
+Consultez les conditions et tarifs affichés avant de créer le service ; le manifeste
+Render demande l'offre `free` si elle est disponible sur votre compte.
 
 ## Accès et données
 
-Cette version n'a pas de comptes utilisateurs : toute personne disposant de l'URL peut
-ouvrir l'outil. Elle ne contient aucun identifiant de courtier et n'envoie aucun ordre.
-Les fichiers importés sont traités en mémoire sur le serveur d'hébergement, pas seulement
-dans le navigateur. N'y importez pas de données confidentielles si vous ne souhaitez pas
-les confier à l'hébergeur. Les imports ne sont pas sauvegardés durablement et un redémarrage
-peut les effacer ; téléchargez vos rapports. Limite d'import : 20 Mo / 50 000 bougies.
-
-## Tester sur un serveur existant
-
-Installez les dépendances dans un environnement virtuel, activez-le, puis :
-
-```bash
-PORT=8501 bash web-start.sh
-```
-
-Pour un serveur public administré par vos soins, un reverse proxy HTTPS prenant en charge
-les WebSockets doit être placé devant Streamlit. `web-start.sh` est destiné à l'hébergement ;
-`start.sh` et `start.bat` restent les lanceurs pour une utilisation locale.
+Le lien n'est pas protégé par un compte utilisateur. Les CSV sont traités sur le serveur
+et ne sont pas sauvegardés durablement par le code. Ne transmettez pas de données
+confidentielles et conservez les exports nécessaires. Aucun ordre réel n'est envoyé.

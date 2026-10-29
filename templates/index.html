@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Analyse technique pédagogique, gestion du risque et simulation historique de vos cours CSV.">
+  <title>Atelier Trading</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script defer src="{{ url_for('static', filename='plotly.min.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='app.js') }}"></script>
+</head>
+<body>
+<aside>
+  <a class="brand" href="/">↗ <span>Atelier Trading<small>Votre laboratoire de marché</small></span></a>
+  <form id="analysis-form">
+    <h2>Votre marché</h2>
+    <label>Source de données<select id="source" name="source"><option value="demo">Démonstration</option><option value="csv">Importer un CSV</option></select></label>
+    <label>Nom de l’actif<input name="symbol" value="DEMO" maxlength="50" required></label>
+    <div id="demo-fields">
+      <label>Bougies fictives<input name="bars" type="number" min="250" max="5000" step="1" value="750" required></label>
+      <label>Scénario<input name="seed" type="number" min="0" max="10000" value="42" required></label>
+    </div>
+    <div id="csv-fields" hidden>
+      <label>Fichier CSV<input id="csv-file" type="file" accept=".csv,text/csv"></label>
+      <p class="hint">3 Mo · 10 000 bougies maximum. Dates ISO 8601, open, high, low, close, volume. Bougies clôturées uniquement.</p>
+    </div>
+    <h2>Gestion du risque</h2>
+    <label>Capital (devise de cotation)<input name="account_balance" type="number" min="1" step="any" value="10000" required></label>
+    <label>Risque par position (%)<input name="max_risk_pct" type="number" min="0.1" max="100" step="any" value="1" required></label>
+    <details><summary>Stratégie et coûts</summary>
+      <label>Stop × ATR<input name="atr_multiple" type="number" min="0.1" step="any" value="1.5" required></label>
+      <label>Ratio gain/risque brut<input name="reward_ratio" type="number" min="2" step="any" value="2" required></label>
+      <label>Distance à l’EMA 50 (%)<input name="pullback_pct" type="number" min="0.1" max="10" step="any" value="1.5" required></label>
+      <label>Frais par transaction (%)<input name="fee_pct" type="number" min="0" max="5" step="any" value="0.1" required></label>
+      <label>Glissement par exécution (%)<input name="slippage_pct" type="number" min="0" max="5" step="any" value="0.05" required></label>
+    </details>
+    <label class="check"><input name="allow_short" type="checkbox"> Simuler aussi les ventes à découvert</label>
+    <label class="check"><input name="run_backtest" type="checkbox" checked> Calculer la simulation historique</label>
+    <button id="submit" type="submit">Lancer l’analyse <span>→</span></button>
+    <p class="hint">Modifiez les paramètres puis relancez l’analyse. Aucune transaction réelle.</p>
+  </form>
+</aside>
+<main>
+  <header><p class="eyebrow">COMPRENDRE · TESTER · DÉCIDER</p><h1>Une vue claire de votre marché.</h1><p class="subtitle">Indicateurs, scénarios et risque, réunis dans un seul espace.</p></header>
+  <p class="notice">Outil pédagogique. Aucun ordre n’est envoyé ; les résultats passés ne garantissent aucun gain.</p>
+  <div id="error" class="error" role="alert" hidden></div>
+  <p id="loading" role="status">Préparation de la démonstration…</p>
+  <section id="results" hidden>
+    <div class="context"><span id="source-label" class="badge"></span><span id="period"></span></div>
+    <div class="metrics"><article><small>Dernier cours</small><strong id="price"></strong></article><article><small>Tendance</small><strong id="trend"></strong></article><article><small>RSI · 14</small><strong id="rsi"></strong></article><article><small>ATR · 14</small><strong id="atr"></strong></article></div>
+    <nav class="tabs" role="tablist" aria-label="Résultats de l’analyse">
+      <button type="button" role="tab" id="tab-market" aria-controls="market" aria-selected="true" data-panel="market">Marché</button>
+      <button type="button" role="tab" id="tab-signal" aria-controls="signal" aria-selected="false" data-panel="signal">Scénario et risque</button>
+      <button type="button" role="tab" id="tab-history" aria-controls="history" aria-selected="false" data-panel="history">Simulation historique</button>
+      <button type="button" role="tab" id="tab-guide" aria-controls="guide" aria-selected="false" data-panel="guide">Mode d’emploi</button>
+    </nav>
+    <section id="market" class="panel" role="tabpanel" aria-labelledby="tab-market">
+      <div class="section-heading"><div><h2>Le marché en perspective</h2><p>Prix, moyennes mobiles et zones de valeur.</p></div><button type="button" class="secondary" id="download-data">Exporter les cours CSV</button></div>
+      <div id="market-chart" class="chart"></div><div id="rsi-chart" class="small-chart"></div>
+      <p class="hint">Affichage des 1 000 dernières bougies au maximum. Calculs sur tout l’historique. Supports/résistances : extrêmes des 30 dernières bougies.</p>
+    </section>
+    <section id="signal" class="panel" role="tabpanel" aria-labelledby="tab-signal" hidden>
+      <h2>Votre checklist</h2><ul id="checklist" class="checklist"></ul><div id="signal-details"></div>
+      <p class="notice">Les niveaux sont indicatifs. Un gap ou une exécution défavorable peut dépasser le budget de risque. Le ratio affiché est brut, avant coûts.</p>
+      <button type="button" class="secondary" id="download-report">Exporter le rapport JSON</button>
+    </section>
+    <section id="history" class="panel" role="tabpanel" aria-labelledby="tab-history" hidden>
+      <h2>La stratégie à l’épreuve du passé</h2><p id="history-status"></p>
+      <div id="history-results" hidden>
+        <div class="metrics"><article><small>Capital final simulé</small><strong id="final-balance"></strong></article><article><small>Rendement net</small><strong id="return"></strong></article><article><small>Baisse maximale</small><strong id="drawdown"></strong></article><article><small>Positions simulées</small><strong id="trade-count"></strong></article></div>
+        <div id="equity-chart" class="small-chart"></div><p id="trade-summary"></p>
+        <button type="button" class="secondary" id="download-journal">Exporter le journal CSV</button>
+        <div class="table-wrap"><table><thead><tr><th>Entrée UTC</th><th>Sens</th><th>Entrée</th><th>Sortie</th><th>Résultat net</th><th>Motif</th></tr></thead><tbody id="trades"></tbody></table></div>
+      </div>
+      <details class="assumptions"><summary>Hypothèses de la simulation</summary><p>200 premières bougies pour les indicateurs. Signal clôturé puis entrée à l’ouverture suivante avec glissement adverse. Une position à la fois, sans levier. Frais à l’entrée et à la sortie. Si stop et objectif sont touchés dans une même bougie, le stop est retenu ; un gap au stop utilise l’ouverture. La dernière position est fermée à la fin de l’échantillon.</p><p>Pas de financement, fiscalité, liquidité, contraintes de lot ou liquidation. La vente à découvert est un modèle simplifié. La baisse maximale utilise le capital aux clôtures. Aucun test hors échantillon ; aucune rentabilité démontrée.</p></details>
+    </section>
+    <section id="guide" class="panel prose" role="tabpanel" aria-labelledby="tab-guide" hidden>
+      <h2>Commencer simplement</h2><ol><li>Explorez la démonstration : tous les prix y sont fictifs.</li><li>Importez au moins 200 bougies clôturées pour votre analyse (202 pour la simulation).</li><li>Ajustez le capital et les coûts à votre marché, puis lancez l’analyse.</li><li>Consultez les critères et exportez vos rapports.</li></ol>
+      <h3>Format CSV</h3><pre>timestamp,open,high,low,close,volume
+2026-01-01T00:00:00Z,100,102,99,101,1200</pre><p>Cette ligne illustre le format. Utilisez des dates ISO 8601 uniques et des nombres avec un point décimal. Les dates sans fuseau sont interprétées en UTC ; les lignes sont triées. Taille maximale : 3 Mo et 10 000 bougies pour limiter les calculs sur l’hébergement web.</p>
+      <h3>Comprendre les règles</h3><p>Le prix et les EMA 20/50/200 doivent être alignés, le cours proche de l’EMA 50 et le RSI entre 40 et 60. Le stop utilise l’ATR de Wilder. La taille intègre les frais et le glissement au stop, avec une exposition plafonnée au capital.</p>
+      <h3>Vos données</h3><p>Les fichiers sont traités sur le serveur, sans sauvegarde durable ni compte utilisateur. N’importez pas d’informations confidentielles. Téléchargez les exports à conserver. Le nom de l’actif est une étiquette : aucun cours en direct n’est téléchargé. Prix et capital doivent être dans la même devise ; les lots et multiplicateurs de contrats ne sont pas modélisés.</p>
+    </section>
+  </section>
+  <footer>Atelier Trading · Analyser avec méthode, simuler avant d’agir.</footer>
+</main>
+</body></html>

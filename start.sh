@@ -5,4 +5,4 @@ if [ ! -x .venv/bin/python ]; then
   python3 -m venv .venv
 fi
 .venv/bin/python -m pip install --disable-pip-version-check -r requirements.txt
-exec .venv/bin/python -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501 --browser.gatherUsageStats false "$@"
+exec .venv/bin/python app.py

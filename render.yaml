@@ -5,7 +5,7 @@ services:
     plan: free
     buildCommand: pip install --disable-pip-version-check -r requirements.txt
     startCommand: bash web-start.sh
-    healthCheckPath: /_stcore/health
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.14"
